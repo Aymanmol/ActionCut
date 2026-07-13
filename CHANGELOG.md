@@ -38,6 +38,11 @@ saturation live **during playback** (sampled ~0.34 → ~0.40) — the effect is 
 by the player, not just at export. (On the software-GL emulator, effects repaint during
 playback; the paused-frame repaint relies on hardware GL and is best-effort there.)
 
+**Tried/Rejected:** a "seek one frame away and back" nudge to repaint the paused frame — the two
+consecutive `seekTo` calls get **coalesced** by ExoPlayer (the second supersedes the first
+before it runs) and the net target equals the current position, so it's a no-op. Use a *single*
+seek to a genuinely different position instead.
+
 ### New logo — the "AC" ligature
 
 Replaced the clapperboard mark with a cleaner **AC ligature**: a red→gold gradient **C** arc
