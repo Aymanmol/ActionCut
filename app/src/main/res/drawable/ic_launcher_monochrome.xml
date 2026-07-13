@@ -3,16 +3,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Single-colour clapperboard silhouette for Android 13+ themed icons -->
+    <!-- Single-colour AC-ligature silhouette for Android 13+ themed icons -->
+    <path
+        android:strokeWidth="12"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFFFF"
+        android:fillColor="#00000000"
+        android:pathData="M72.76,73.42 A27,27 0 0 1 27,54 A27,27 0 0 1 72.76,34.58" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M22,50 L82,50 A5,5 0 0 1 87,55 L87,80 A5,5 0 0 1 82,85 L22,85 A5,5 0 0 1 17,80 L17,55 A5,5 0 0 1 22,50 Z" />
-    <group
-        android:rotation="-9"
-        android:pivotX="22"
-        android:pivotY="47">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M20,33 L82,33 A3,3 0 0 1 85,36 L85,47 L17,47 L17,36 A3,3 0 0 1 20,33 Z" />
-    </group>
+        android:pathData="M45,40 L69,54 L45,68 Q45,68.6 44,68 L44,40 Q45,39.4 45,40 Z" />
 </vector>

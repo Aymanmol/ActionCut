@@ -48,13 +48,13 @@ object EffectMapper {
     fun videoEffects(clip: Clip, targetWidth: Int, targetHeight: Int): List<Effect> =
         videoEffects(clip, targetWidth, targetHeight, emptyList())
 
-    fun videoEffects(
-        clip: Clip,
-        targetWidth: Int,
-        targetHeight: Int,
-        overlays: List<Clip>,
-        presentationLayout: Int = Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP,
-    ): List<Effect> {
+    /**
+     * Effects for the LIVE editor preview (colour, LUT filter, adjustments, stylized GL
+     * effects, crop, rotate). Excludes the export-only output [Presentation] scaling,
+     * Compose-rendered overlays, and speed (previewed via PlaybackParameters). Applied to the
+     * ExoPlayer via `setVideoEffects` so edits are visible immediately.
+     */
+    fun previewVideoEffects(clip: Clip): List<Effect> {
         val effects = mutableListOf<Effect>()
 
         // --- Geometry ---
@@ -92,6 +92,18 @@ object EffectMapper {
 
         // --- Stylistic visual effects ---
         clip.effects.forEach { ve -> visualEffect(ve)?.let { effects += it } }
+
+        return effects
+    }
+
+    fun videoEffects(
+        clip: Clip,
+        targetWidth: Int,
+        targetHeight: Int,
+        overlays: List<Clip>,
+        presentationLayout: Int = Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP,
+    ): List<Effect> {
+        val effects = previewVideoEffects(clip).toMutableList()
 
         // --- Speed (video): constant or a variable ramp curve ---
         if (clip.type == ClipType.VIDEO) {

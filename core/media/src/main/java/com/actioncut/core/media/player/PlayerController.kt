@@ -2,10 +2,12 @@ package com.actioncut.core.media.player
 
 import android.content.Context
 import androidx.media3.common.C
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.actioncut.core.media.export.EffectMapper
 import com.actioncut.core.model.Clip
 import com.actioncut.core.model.ClipType
 import com.actioncut.core.model.Timeline
@@ -61,6 +63,13 @@ class PlayerController @Inject constructor(
     /** Per-playlist-item volume (0..1 for ExoPlayer), kept in sync with the timeline. */
     private var clipVolumes: List<Float> = emptyList()
 
+    /** The video-lane clips currently loaded in [player], parallel to its media items. Used to
+     *  compute each clip's live preview effect chain (colour/filter/adjust/crop/rotate). */
+    private var previewClips: List<Clip> = emptyList()
+
+    /** Fingerprint of the last-applied preview effect chain, to skip redundant `setVideoEffects`. */
+    private var lastPreviewSignature: String? = null
+
     // Cumulative *timeline* start offset (ms) of each preview item per lane, so we can map
     // ExoPlayer's per-item position to an absolute timeline position (and back). Without
     // this the playhead snaps to 0 at every clip boundary (the "jumps back to first" bug).
@@ -83,6 +92,7 @@ class PlayerController @Inject constructor(
         }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             applyCurrentVolume()
+            applyPreviewEffects()
             pushState()
         }
         override fun onPositionDiscontinuity(
@@ -99,6 +109,7 @@ class PlayerController @Inject constructor(
     /** Rebuilds the preview playlist from [timeline]'s main video lane. */
     fun setTimeline(timeline: Timeline) {
         val clips = previewClips(timeline)
+        previewClips = clips
         clipVolumes = clips.map { it.volume }
         videoStartsMs = cumulativeStarts(clips.map { previewDurationMs(it) })
         totalPreviewMs = (videoStartsMs.lastOrNull() ?: 0L) + (clips.lastOrNull()?.let { previewDurationMs(it) } ?: 0L)
@@ -122,6 +133,7 @@ class PlayerController @Inject constructor(
         player.setMediaItems(items)
         player.prepare()
         applyCurrentVolume()
+        applyPreviewEffects(force = true)
 
         // Build the audio-lane playlist for the secondary player.
         val audioClips = audioClipsOf(timeline)
@@ -206,6 +218,47 @@ class PlayerController @Inject constructor(
         clipVolumes = previewClips(timeline).map { it.volume }
         applyCurrentVolume()
     }
+
+    /**
+     * Refreshes the LIVE preview effect chain (colour / LUT filter / adjustments / stylized GL
+     * effects / crop / rotate) without rebuilding the playlist, so tapping a filter, dragging an
+     * adjustment slider, or toggling an effect is visible in the preview immediately (WYSIWYG).
+     */
+    fun refreshPreviewEffects(timeline: Timeline) {
+        previewClips = previewClips(timeline)
+        applyPreviewEffects()
+    }
+
+    /** Applies the current video clip's preview effects to [player] via `setVideoEffects`. */
+    private fun applyPreviewEffects(force: Boolean = false) {
+        val clip = previewClips.getOrNull(player.currentMediaItemIndex)
+        val signature = previewEffectSignature(clip)
+        // Skip when the visual effect chain is unchanged (e.g. a volume-only edit), so dragging
+        // the volume slider doesn't trigger a needless GL rebuild + seek nudge on every update.
+        if (!force && signature == lastPreviewSignature) return
+        lastPreviewSignature = signature
+        val effects: List<Effect> = clip?.let { EffectMapper.previewVideoEffects(it) } ?: emptyList()
+        // Guard: GL effect setup can throw on some devices/surfaces; never let it crash preview.
+        runCatching {
+            player.setVideoEffects(effects)
+            // A paused frame is NOT reprocessed when the effect chain changes, and a seek to the
+            // SAME position is a no-op (consecutive seeks also get coalesced). So do a SINGLE seek
+            // one millisecond away — the same displayed frame, but re-rendered through the new
+            // effect pipeline — making the filter/adjustment visible immediately (WYSIWYG). The
+            // sub-frame playhead drift is imperceptible.
+            if (!player.isPlaying && player.playbackState == Player.STATE_READY) {
+                val pos = player.currentPosition.coerceAtLeast(0L)
+                val dur = player.duration.takeIf { it > 0L } ?: (pos + 100L)
+                val target = if (pos + 1L < dur) pos + 1L else (pos - 1L).coerceAtLeast(0L)
+                if (target != pos) player.seekTo(target)
+            }
+        }
+    }
+
+    /** Stable fingerprint of the fields that affect a clip's preview effect chain. */
+    private fun previewEffectSignature(clip: Clip?): String = if (clip == null) "" else
+        "${clip.id}|${clip.rotationDegrees}|${clip.transform.rotationDegrees}|" +
+            "${clip.crop}|${clip.adjustments}|${clip.filter}|${clip.effects}"
 
     private fun previewClips(timeline: Timeline): List<Clip> =
         timeline.videoTracks.firstOrNull()?.clips.orEmpty()

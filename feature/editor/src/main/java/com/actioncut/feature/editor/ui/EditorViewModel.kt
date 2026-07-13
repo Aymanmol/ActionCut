@@ -490,8 +490,10 @@ class EditorViewModel @Inject constructor(
             playerController.setTimeline(timeline)
             playerController.seekTo(_uiState.value.playheadMs)
         } else {
-            // Reflect volume/mute changes in the preview without a disruptive rebuild.
+            // Reflect volume/mute + effect/filter/adjust changes in the preview without a
+            // disruptive playlist rebuild (live WYSIWYG).
             playerController.updateVolumes(timeline)
+            playerController.refreshPreviewEffects(timeline)
         }
         scheduleSave()
     }

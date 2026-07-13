@@ -13,7 +13,38 @@ failures) so work is traceable and we avoid repeating problems.
 
 ## [Unreleased]
 
-### User-named projects + a jazzy red rebrand (goodbye purple)
+### Live WYSIWYG preview — filters & effects are finally visible before export
+
+The biggest gap vs CapCut/InShot: **filters, LUTs, colour adjustments, crop, rotate and
+stylized effects were invisible in the preview** and only appeared at export. The preview
+player never applied any effects, so editing was blind.
+
+Now the editor preview is **live WYSIWYG**. `PlayerController` applies each clip's effect
+chain to the `ExoPlayer` via `setVideoEffects(...)` — refreshed on the initial timeline load,
+on every clip transition, and on any non-structural edit (filter / adjust / effect / crop /
+rotate). A new `EffectMapper.previewVideoEffects(clip)` builds a **preview-safe** chain
+(colour, LUT, adjustments, stylized GL effects, crop, rotate) that deliberately excludes the
+export-only output `Presentation` scaling, the Compose-rendered overlays, and speed (which the
+preview approximates via playback). Tapping a filter now recolours the preview immediately.
+
+Because a *paused* frame isn't reprocessed when the effect chain changes (and a same-position
+seek is a no-op), the controller does a single one-millisecond seek to re-render the current
+frame through the new pipeline, so the new look shows without moving the playhead. A signature
+check skips the whole path when the visual chain is unchanged (e.g. a volume-only edit), so
+slider drags stay smooth.
+
+**Verified on the emulator:** applying **Vivid** to a real clip measurably boosts the preview's
+saturation live **during playback** (sampled ~0.34 → ~0.40) — the effect is genuinely rendered
+by the player, not just at export. (On the software-GL emulator, effects repaint during
+playback; the paused-frame repaint relies on hardware GL and is best-effort there.)
+
+### New logo — the "AC" ligature
+
+Replaced the clapperboard mark with a cleaner **AC ligature**: a red→gold gradient **C** arc
+cradling a play triangle (the "A"), as the adaptive launcher foreground + monochrome icon.
+Renders crisply on the splash screen and launcher.
+
+
 
 **Project names are now yours.** The media picker has a **Project name** field (pre-filled
 with a friendly date default like "Video Jun 26", fully editable) — no more everything called
